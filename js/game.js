@@ -54,6 +54,7 @@ export class Game {
     this.crystals = 0;
     this.timeLeft = GAME.TIME_LIMIT;
     this.frameAcc = 0;
+    this.invuln = 0;
     this.state = STATE.PLAYING;
     this.hideOverlay();
   }
@@ -72,6 +73,7 @@ export class Game {
 
   respawn() {
     this.player.reset(60, WORLD.FLOOR_Y - PLAYER.H);
+    this.invuln = GAME.RESPAWN_INVULN;
     this.state = STATE.PLAYING;
   }
 
@@ -121,13 +123,15 @@ export class Game {
     this.screen.update();
     this.player.update((wx) => this.screen.isSolidAt(wx), this.screen.tethers);
 
-    // Fell into a chasm?
+    if (this.invuln > 0) this.invuln--;
+
+    // Fell into a chasm? (the void is fatal even during invulnerability)
     if (this.player.fellIntoChasm) { this.loseLife(); return; }
 
     // Hazard + pickup collisions.
     const box = this.player.box;
     for (const e of this.screen.entities) {
-      if (e.kind === "hazard" && e.hits && e.hits(box)) { this.loseLife(); return; }
+      if (this.invuln <= 0 && e.kind === "hazard" && e.hits && e.hits(box)) { this.loseLife(); return; }
       if (e.kind === "pickup" && e.hits && e.hits(box)) {
         e.collected = true;
         this.crystals++;
@@ -172,7 +176,10 @@ export class Game {
     }
 
     this.screen.draw(ctx);
-    this.player.draw(ctx);
+    // Blink the astronaut while invulnerable so the grace period is legible.
+    if (this.invuln <= 0 || Math.floor(this.invuln / 6) % 2 === 0) {
+      this.player.draw(ctx);
+    }
     this.drawHUD(ctx);
 
     if (this.state === STATE.PAUSED) this.drawCenter(ctx, "PAUSED", "press P to resume");

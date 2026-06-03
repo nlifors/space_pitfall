@@ -11,17 +11,17 @@ export const VIEW = {
 export const WORLD = {
   FLOOR_Y: 330,       // top of the surface platform
   FLOOR_H: 120,       // visual thickness of the surface
-  GRAVITY: 0.55,
+  GRAVITY: 0.48,      // a touch floatier = more airtime to clear gaps
   TERMINAL_VY: 14,
 };
 
 export const PLAYER = {
   W: 22,
   H: 34,
-  RUN_SPEED: 3.4,
-  JUMP_VY: -11.5,
-  COYOTE_FRAMES: 6,   // grace frames to still jump after leaving an edge
-  START_LIVES: 3,
+  RUN_SPEED: 3.9,     // more ground speed to dodge / build swing distance
+  JUMP_VY: -12.6,     // higher jump to clear chasms comfortably
+  COYOTE_FRAMES: 10,  // generous grace to still jump after leaving an edge
+  START_LIVES: 5,
 };
 
 // Pendulum "energy tether" the player swings across wide chasms with.
@@ -29,7 +29,7 @@ export const TETHER = {
   LENGTH: 120,
   GRAVITY: 0.0045,    // angular gravity constant (g/L baked in)
   DAMPING: 0.999,
-  GRAB_RADIUS: 26,
+  GRAB_RADIUS: 40,    // forgiving grab so the swing isn't pixel-perfect
   RELEASE_BOOST: 1.15,
 };
 
@@ -40,8 +40,9 @@ export const SCORE = {
 };
 
 export const GAME = {
-  TIME_LIMIT: 120,    // seconds to clear all screens
+  TIME_LIMIT: 180,    // seconds to clear all screens
   SCREEN_COUNT: 8,    // procedurally themed screens per run
+  RESPAWN_INVULN: 110, // frames of invulnerability + blink after respawn
 };
 
 // Named palette so render code reads intention, not hex codes.

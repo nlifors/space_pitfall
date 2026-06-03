@@ -65,32 +65,30 @@ function buildScreen(index, difficulty) {
   // Pick a screen archetype.
   const roll = rng();
   if (roll < 0.34) {
-    // Chasm crossing — wide gap with a tether to swing over.
-    const gapW = 150 + difficulty * 90;
+    // Chasm crossing — narrow enough to jump, with a tether as a safety net.
+    const gapW = 100 + difficulty * 55;
     const gapX = VIEW.WIDTH / 2 - gapW / 2 + (rng() - 0.5) * 60;
     chasms.push(new Chasm(gapX, gapW));
     entities.push(new Tether(gapX + gapW / 2, 60));
   } else if (roll < 0.6) {
     // Crawler patrol on open surface.
-    const count = 1 + Math.round(difficulty * 2);
+    const count = 1 + Math.round(difficulty * 1);
     for (let i = 0; i < count; i++) {
-      const minX = 120 + i * 200;
-      entities.push(new Crawler(minX + 40, minX, minX + 160, 1 + difficulty * 1.4));
+      const minX = 120 + i * 220;
+      entities.push(new Crawler(minX + 40, minX, minX + 150, 0.8 + difficulty * 0.9));
     }
   } else if (roll < 0.8) {
     // Rolling asteroids barreling in from the right.
-    const count = 1 + Math.round(difficulty * 1.5);
+    const count = 1 + Math.round(difficulty * 1);
     for (let i = 0; i < count; i++) {
-      entities.push(new Asteroid(VIEW.WIDTH, 2 + difficulty * 2, VIEW.WIDTH + i * 260));
+      entities.push(new Asteroid(VIEW.WIDTH, 1.6 + difficulty * 1.3, VIEW.WIDTH + i * 320));
     }
   } else {
-    // Laser corridor — timed beams to dash between.
-    const count = 2 + Math.round(difficulty * 2);
+    // Laser corridor — timed beams to dash between (longer "off" = bigger gaps).
+    const count = 1 + Math.round(difficulty * 1.5);
     for (let i = 0; i < count; i++) {
-      entities.push(new Laser(180 + i * 150, 60, 50, i * 30));
+      entities.push(new Laser(200 + i * 170, 50, 70, i * 40));
     }
-    // a small gap to keep it spicy
-    if (rng() > 0.5) chasms.push(new Chasm(VIEW.WIDTH - 140, 70));
   }
 
   return new Screen({ chasms, entities });
