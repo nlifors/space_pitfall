@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Space Pitfall</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="game-shell">
+    <canvas id="game" width="800" height="450"></canvas>
+
+    <!-- Title / pause / game-over overlays are toggled by the game state machine -->
+    <div id="overlay" class="overlay">
+      <h1 class="logo">SPACE<span>PITFALL</span></h1>
+      <p id="overlay-msg">Cross the chasms. Grab the crystals. Beware the void.</p>
+      <ul id="controls-hint">
+        <li><b>&larr; &rarr;</b> move</li>
+        <li><b>Space / &uarr;</b> jump</li>
+        <li><b>Z</b> grab tether</li>
+        <li><b>P</b> pause</li>
+      </ul>
+      <button id="start-btn">LAUNCH</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
