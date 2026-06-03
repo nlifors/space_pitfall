@@ -166,6 +166,16 @@ export class Game {
   // ---- rendering ------------------------------------------------------------
   render() {
     const ctx = this.ctx;
+    // Map the fixed 800x450 logical space onto the (resizable) backing store.
+    // The CSS keeps the canvas at 16:9, so this scale is uniform — no distortion.
+    ctx.setTransform(
+      ctx.canvas.width / VIEW.WIDTH,
+      0,
+      0,
+      ctx.canvas.height / VIEW.HEIGHT,
+      0,
+      0
+    );
     ctx.fillStyle = "#05060f";
     ctx.fillRect(0, 0, VIEW.WIDTH, VIEW.HEIGHT);
     this.drawStars(ctx);

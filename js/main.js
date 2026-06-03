@@ -10,6 +10,18 @@ const overlay = {
   button: document.getElementById("start-btn"),
 };
 
+// Match the canvas backing store to its on-screen size at native pixel density
+// so the game renders crisply at any window size. The Game keeps drawing in its
+// fixed 800x450 logical space and scales the context to fit (see Game.render).
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.round(rect.width * dpr));
+  canvas.height = Math.max(1, Math.round(rect.height * dpr));
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
 const game = new Game(canvas, overlay);
 
 overlay.button.addEventListener("click", () => game.start());
