@@ -20,6 +20,7 @@ export const PLAYER = {
   H: 34,
   RUN_SPEED: 3.9,     // more ground speed to dodge / build swing distance
   JUMP_VY: -12.6,     // higher jump to clear chasms comfortably
+  JUMP_CUT_VY: -4.5,  // releasing jump mid-rise trims upward speed to this (hop)
   COYOTE_FRAMES: 10,  // generous grace to still jump after leaving an edge
   START_LIVES: 5,
 };

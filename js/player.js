@@ -25,6 +25,7 @@ export class Player {
     this.coyote = 0;
     this.tether = null;     // currently-held Tether, if swinging
     this.runPhase = 0;
+    this.jumped = false;    // true while rising from a jump (for variable height)
     this.fellIntoChasm = false;
   }
 
@@ -57,6 +58,11 @@ export class Player {
 
     // ---- gravity ----
     this.vy = Math.min(this.vy + WORLD.GRAVITY, WORLD.TERMINAL_VY);
+    // Variable jump height: let go of jump while still rising fast -> short hop.
+    if (this.jumped && !input.isDown("jump") && this.vy < PLAYER.JUMP_CUT_VY) {
+      this.vy = PLAYER.JUMP_CUT_VY;
+      this.jumped = false;
+    }
     this.y += this.vy;
 
     // ---- ground / chasm resolution ----
@@ -69,6 +75,7 @@ export class Player {
       this.vy = 0;
       this.state = STATE.GROUND;
       this.coyote = PLAYER.COYOTE_FRAMES;
+      this.jumped = false;
     } else {
       this.state = STATE.AIR;
       if (this.coyote > 0) this.coyote--;
@@ -83,6 +90,7 @@ export class Player {
       this.vy = PLAYER.JUMP_VY;
       this.state = STATE.AIR;
       this.coyote = 0;
+      this.jumped = true;
     }
 
     // ---- grab a tether ----

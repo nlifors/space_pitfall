@@ -7,6 +7,13 @@ import { VIEW, WORLD, PLAYER, GAME, SCORE, COLORS } from "./constants.js";
 import { input } from "./input.js";
 import { Player } from "./player.js";
 import { buildLevel } from "./level.js";
+import { Particles } from "./particles.js";
+
+// The simulation runs at a fixed 60 ticks/second. Rendering happens once per
+// animation frame; the accumulator below runs as many fixed ticks as real time
+// demands, so the game plays at the same speed on 60/120/144Hz displays.
+const STEP_MS = 1000 / 60;
+const MAX_FRAME_MS = 250; // clamp huge gaps (tab-out) to avoid a tick spiral
 
 const STATE = {
   TITLE: "title",
@@ -24,7 +31,10 @@ export class Game {
     this.state = STATE.TITLE;
     this.stars = this.makeStars(90);
     this.lastTime = 0;
+    this.acc = 0; // accumulated real time owed to the fixed-step simulation
     this.respawnTimer = 0;
+    this.fx = new Particles();
+    this.shake = 0; // screen-shake intensity in logical px, decays each frame
 
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
@@ -55,6 +65,8 @@ export class Game {
     this.timeLeft = GAME.TIME_LIMIT;
     this.frameAcc = 0;
     this.invuln = 0;
+    this.fx = new Particles();
+    this.shake = 0;
     this.state = STATE.PLAYING;
     this.hideOverlay();
   }
@@ -62,6 +74,14 @@ export class Game {
   get screen() { return this.screens[this.screenIndex]; }
 
   loseLife() {
+    // Death juice: a bright suit-colored burst plus a sharp screen shake.
+    this.fx.emit(this.player.centerX, this.player.centerY, {
+      count: 26, color: COLORS.player, speed: 4.5, gravity: 0.12, life: 38, size: 3, drag: 0.93,
+    });
+    this.fx.emit(this.player.centerX, this.player.centerY, {
+      count: 14, color: COLORS.visor, speed: 3, gravity: 0.08, life: 30, size: 2, drag: 0.93,
+    });
+    this.shake = 14;
     this.lives--;
     if (this.lives <= 0) {
       this.endGame(false);
@@ -123,6 +143,15 @@ export class Game {
     this.screen.update();
     this.player.update((wx) => this.screen.isSolidAt(wx), this.screen.tethers);
 
+    // Jet exhaust: a steady downward spray of sparks whenever airborne/swinging.
+    if (this.player.state !== "ground") {
+      this.fx.emit(this.player.centerX, this.player.y + this.player.h, {
+        count: 2, color: COLORS.visor, dir: Math.PI / 2, spread: 0.7,
+        speed: 1.8, gravity: 0.04, life: 16, size: 3, drag: 0.9,
+      });
+    }
+    this.fx.update();
+
     if (this.invuln > 0) this.invuln--;
 
     // Fell into a chasm? (the void is fatal even during invulnerability)
@@ -136,6 +165,9 @@ export class Game {
         e.collected = true;
         this.crystals++;
         this.score += SCORE.CRYSTAL;
+        this.fx.emit(e.x + e.w / 2, e.y + e.h / 2, {
+          count: 18, color: COLORS.crystal, speed: 3.2, gravity: 0.05, life: 34, size: 3, drag: 0.92,
+        });
       }
     }
     // Drop collected pickups.
@@ -147,20 +179,39 @@ export class Game {
   }
 
   // ---- main loop ------------------------------------------------------------
+  // Fixed-timestep: accumulate elapsed wall-clock time and run whole 1/60s ticks
+  // until it's spent, then render once. Decouples game speed from refresh rate.
   loop(ts) {
     requestAnimationFrame(this.loop);
 
+    if (!this.lastTime) this.lastTime = ts;
+    let frame = ts - this.lastTime;
+    this.lastTime = ts;
+    if (frame > MAX_FRAME_MS) frame = MAX_FRAME_MS;
+
+    this.acc += frame;
+    while (this.acc >= STEP_MS) {
+      this.tick();
+      this.acc -= STEP_MS;
+      // Consume edge-triggered presses with the tick that saw them so a single
+      // tap can't be processed by two ticks in one render frame.
+      input.endFrame();
+    }
+
+    this.render();
+  }
+
+  // One fixed simulation tick. All time-based game state advances here.
+  tick() {
     if (this.state === STATE.PLAYING) {
       if (input.wasPressed("pause")) { this.state = STATE.PAUSED; }
       else this.step();
     } else if (this.state === STATE.PAUSED) {
       if (input.wasPressed("pause")) this.state = STATE.PLAYING;
     } else if (this.state === STATE.RESPAWN) {
+      this.fx.update(); // let the death burst finish during the pause
       if (--this.respawnTimer <= 0) this.respawn();
     }
-
-    this.render();
-    input.endFrame();
   }
 
   // ---- rendering ------------------------------------------------------------
@@ -185,11 +236,23 @@ export class Game {
       return;
     }
 
+    // World layer — offset by the screen shake so the HUD (drawn after) stays
+    // rock steady. Stars/background above are not shaken either.
+    ctx.save();
+    if (this.shake > 0.4) {
+      ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
+      this.shake *= 0.86;
+    } else {
+      this.shake = 0;
+    }
     this.screen.draw(ctx);
     // Blink the astronaut while invulnerable so the grace period is legible.
     if (this.invuln <= 0 || Math.floor(this.invuln / 6) % 2 === 0) {
       this.player.draw(ctx);
     }
+    this.fx.draw(ctx);
+    ctx.restore();
+
     this.drawHUD(ctx);
 
     if (this.state === STATE.PAUSED) this.drawCenter(ctx, "PAUSED", "press P to resume");
