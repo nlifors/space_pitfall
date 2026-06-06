@@ -12,9 +12,12 @@ ES modules must be served over HTTP (opening `index.html` via `file://` is
 blocked by browser CORS rules). From the project root:
 
 ```bash
-python3 -m http.server 8000
-# then open http://localhost:8000
+python3 serve.py            # no-cache dev server -> http://localhost:8000
+# or: python3 -m http.server 8000   (caches modules; hard-reload after edits)
 ```
+
+`serve.py` disables HTTP caching so code edits show up on a normal refresh. With
+plain `http.server` you must hard-reload (⌘+Shift+R) to drop cached JS modules.
 
 ## Controls
 
@@ -24,6 +27,7 @@ python3 -m http.server 8000
 | `Space` / `↑`  | Jump             |
 | `Z`            | Grab / release tether |
 | `P`            | Pause            |
+| `M`            | Mute / unmute    |
 | `Enter`        | Start / restart  |
 
 ## Goal

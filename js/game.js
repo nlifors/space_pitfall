@@ -25,9 +25,10 @@ const STATE = {
 };
 
 export class Game {
-  constructor(canvas, overlay) {
+  constructor(canvas, overlay, audio) {
     this.ctx = canvas.getContext("2d");
     this.overlay = overlay; // { root, msg, button, title }
+    this.audio = audio;
     this.state = STATE.TITLE;
     this.stars = this.makeStars(90);
     this.lastTime = 0;
@@ -69,6 +70,8 @@ export class Game {
     this.shake = 0;
     this.state = STATE.PLAYING;
     this.hideOverlay();
+    this.audio.unlock();
+    this.audio.startMusic();
   }
 
   get screen() { return this.screens[this.screenIndex]; }
@@ -82,6 +85,7 @@ export class Game {
       count: 14, color: COLORS.visor, speed: 3, gravity: 0.08, life: 30, size: 2, drag: 0.93,
     });
     this.shake = 14;
+    this.audio.death();
     this.lives--;
     if (this.lives <= 0) {
       this.endGame(false);
@@ -108,6 +112,7 @@ export class Game {
       return;
     }
     this.screenIndex = next;
+    if (dir > 0) this.audio.sector(); // a little chime on clearing a sector
     // Enter from the opposite edge we exited.
     this.player.x = dir > 0 ? 2 : VIEW.WIDTH - this.player.w - 2;
   }
@@ -116,6 +121,8 @@ export class Game {
     if (won) {
       this.score += SCORE.LEVEL_CLEAR + Math.floor(this.timeLeft) * SCORE.TIME_BONUS_PER_SEC;
     }
+    this.audio.stopMusic();
+    if (won) this.audio.win();
     this.state = won ? STATE.WIN : STATE.GAMEOVER;
     this.showOverlay(
       won ? "MISSION COMPLETE" : "LOST TO THE VOID",
@@ -143,11 +150,21 @@ export class Game {
     this.screen.update();
     this.player.update((wx) => this.screen.isSolidAt(wx), this.screen.tethers);
 
-    // Jet exhaust: a steady downward spray of sparks whenever airborne/swinging.
+    // Translate the player's one-frame event flags into sound effects.
+    if (this.player.justJumped) { this.audio.jump(); this.player.justJumped = false; }
+    if (this.player.justGrabbed) { this.audio.grab(); this.player.justGrabbed = false; }
+    if (this.player.justReleased) { this.audio.release(); this.player.justReleased = false; }
+
+    // Jet exhaust: a warm downward plume from the jetpack nozzle while flying.
     if (this.player.state !== "ground") {
-      this.fx.emit(this.player.centerX, this.player.y + this.player.h, {
-        count: 2, color: COLORS.visor, dir: Math.PI / 2, spread: 0.7,
-        speed: 1.8, gravity: 0.04, life: 16, size: 3, drag: 0.9,
+      const noz = this.player.jetNozzle;
+      this.fx.emit(noz.x, noz.y, {
+        count: 2, color: COLORS.flameCore, dir: Math.PI / 2, spread: 0.5,
+        speed: 2.4, gravity: 0.05, life: 18, size: 3, drag: 0.9,
+      });
+      this.fx.emit(noz.x, noz.y, {
+        count: 1, color: COLORS.flame, dir: Math.PI / 2, spread: 0.9,
+        speed: 1.7, gravity: 0.04, life: 24, size: 4, drag: 0.9,
       });
     }
     this.fx.update();
@@ -168,6 +185,7 @@ export class Game {
         this.fx.emit(e.x + e.w / 2, e.y + e.h / 2, {
           count: 18, color: COLORS.crystal, speed: 3.2, gravity: 0.05, life: 34, size: 3, drag: 0.92,
         });
+        this.audio.collect();
       }
     }
     // Drop collected pickups.
@@ -203,6 +221,8 @@ export class Game {
 
   // One fixed simulation tick. All time-based game state advances here.
   tick() {
+    if (input.wasPressed("mute")) this.audio.toggleMute();
+
     if (this.state === STATE.PLAYING) {
       if (input.wasPressed("pause")) { this.state = STATE.PAUSED; }
       else this.step();
@@ -246,6 +266,9 @@ export class Game {
       this.shake = 0;
     }
     this.screen.draw(ctx);
+    // Defensive: never let an entity's glow (shadow) state bleed onto the player.
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = "transparent";
     // Blink the astronaut while invulnerable so the grace period is legible.
     if (this.invuln <= 0 || Math.floor(this.invuln / 6) % 2 === 0) {
       this.player.draw(ctx);
@@ -279,6 +302,11 @@ export class Game {
     ctx.fillText(`SCORE ${this.score}`, 12, 15);
     ctx.fillText(`◆ ${this.crystals}`, 170, 15);
 
+    // sound state (toggle with M)
+    ctx.fillStyle = this.audio.muted ? "#5b6b8c" : COLORS.hud;
+    ctx.fillText(this.audio.muted ? "♪ off" : "♪ on", 250, 15);
+
+    ctx.fillStyle = COLORS.hud;
     ctx.textAlign = "center";
     ctx.fillText(`SECTOR ${this.screenIndex + 1}/${this.screens.length}`, VIEW.WIDTH / 2, 15);
 

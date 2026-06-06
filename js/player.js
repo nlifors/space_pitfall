@@ -27,6 +27,10 @@ export class Player {
     this.runPhase = 0;
     this.jumped = false;    // true while rising from a jump (for variable height)
     this.fellIntoChasm = false;
+    // One-frame event flags the Game reads to fire sound effects, then clears.
+    this.justJumped = false;
+    this.justGrabbed = false;
+    this.justReleased = false;
   }
 
   get box() {
@@ -35,6 +39,21 @@ export class Player {
 
   get centerX() { return this.x + this.w / 2; }
   get centerY() { return this.y + this.h / 2; }
+
+  // World position of the jetpack nozzle, kept in sync with draw()'s geometry so
+  // the exhaust particles stream from the pack rather than the feet. (Ignores the
+  // small running bob, which doesn't apply while airborne anyway.)
+  get jetNozzle() {
+    const cx = this.x + this.w / 2;
+    const torsoW = 13;
+    const torsoX = cx - torsoW / 2;
+    const back = -this.facing;
+    const packW = 8;
+    const packX = back > 0 ? torsoX + torsoW - 1 : torsoX - packW + 1;
+    const nozX = back > 0 ? packX + packW - 3 : packX + 1;
+    const nozY = this.y + 11 - 1 + 16; // torsoY(=y+11) - 1 + packH(16)
+    return { x: nozX + 1.5, y: nozY + 1 };
+  }
 
   // `onSolidGround(worldX)` returns false when the surface beneath worldX is a
   // chasm, true otherwise. Supplied by the Game from the active screen.
@@ -91,6 +110,7 @@ export class Player {
       this.state = STATE.AIR;
       this.coyote = 0;
       this.jumped = true;
+      this.justJumped = true;
     }
 
     // ---- grab a tether ----
@@ -105,6 +125,7 @@ export class Player {
         this.tether = t;
         t.occupied = true;
         this.state = STATE.SWING;
+        this.justGrabbed = true;
         return;
       }
     }
@@ -134,43 +155,142 @@ export class Player {
     t.occupied = false;
     this.tether = null;
     this.state = STATE.AIR;
+    this.justReleased = true;
   }
 
   draw(ctx) {
-    const { x, y, w, h } = this;
-    ctx.save();
+    const { x, y, w, facing } = this;
+    const cx = x + w / 2;
+    const onGround = this.state === STATE.GROUND;
+    const running = onGround && Math.abs(this.vx) > 0.1;
+    const thrusting = this.state !== STATE.GROUND;
+    const phase = this.runPhase;
 
-    // Backpack jets flicker while airborne / swinging.
-    if (this.state !== STATE.GROUND) {
-      ctx.fillStyle = "rgba(67,224,255,0.7)";
-      const flame = 4 + Math.random() * 5;
-      ctx.fillRect(x + 4, y + h - 2, 5, flame);
-      ctx.fillRect(x + w - 9, y + h - 2, 5, flame);
+    // A little vertical bounce on each running stride.
+    const bob = running ? Math.abs(Math.sin(phase)) * 1.4 : 0;
+    const top = y - bob;
+    const back = -facing; // the jetpack rides on the astronaut's back
+
+    ctx.save();
+    ctx.lineCap = "round";
+
+    // Body geometry (relative to the bobbed top).
+    const torsoW = 13;
+    const torsoX = cx - torsoW / 2;
+    const torsoY = top + 11;
+    const torsoH = 13;
+    const hipY = torsoY + torsoH;
+    const headCx = cx + facing * 1.5;
+    const headCy = top + 7;
+    const headR = 7.5;
+
+    // ---------- Jetpack (drawn behind the body) ----------
+    // A light border around the pack keeps it readable on any background — over
+    // dark space and over the bright red laser beam alike.
+    const packW = 8;
+    const packH = 16;
+    const packX = back > 0 ? torsoX + torsoW - 1 : torsoX - packW + 1;
+    const packY = torsoY - 1;
+    const nozX = back > 0 ? packX + packW - 3 : packX + 1; // nozzle on the back edge
+    const nozY = packY + packH;
+
+    // Thrust flame (under the pack) — flickers while airborne or swinging.
+    if (thrusting) {
+      const fl = 7 + Math.random() * 8;
+      ctx.fillStyle = COLORS.flame;
+      ctx.beginPath();
+      ctx.moveTo(nozX - 1.5, nozY);
+      ctx.lineTo(nozX + 4.5, nozY);
+      ctx.lineTo(nozX + 1.5, nozY + fl);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = COLORS.flameCore;
+      ctx.beginPath();
+      ctx.moveTo(nozX, nozY);
+      ctx.lineTo(nozX + 3, nozY);
+      ctx.lineTo(nozX + 1.5, nozY + fl * 0.55);
+      ctx.closePath();
+      ctx.fill();
     }
 
-    // Suit body
+    // Light border (also forms the tank cap poking above the shoulder).
+    ctx.fillStyle = COLORS.packTrim;
+    ctx.fillRect(packX - 1, packY - 3, packW + 2, packH + 4);
+    // Body inset within the border.
+    ctx.fillStyle = COLORS.pack;
+    ctx.fillRect(packX, packY, packW, packH - 1);
+    // Trim bands + nozzle.
+    ctx.fillStyle = COLORS.packTrim;
+    ctx.fillRect(packX, packY + 4, packW, 2);
+    ctx.fillRect(packX, packY + packH - 5, packW, 2);
+    ctx.fillRect(nozX, nozY, 3, 3);
+
+    // ---------- Legs (run cycle: opposite swing, tucked while flying) ----------
+    const stride = running ? Math.sin(phase) * 5 : 0;
+    const tuck = thrusting ? 4 : 0;
+    drawLimb(ctx, cx + 1, hipY, cx + 3 + stride, hipY + 8 - tuck - Math.max(0, stride) * 0.4,
+             5, COLORS.playerSuit, COLORS.player);      // near leg
+    drawLimb(ctx, cx - 1, hipY, cx - 3 - stride, hipY + 8 - tuck - Math.max(0, -stride) * 0.4,
+             5, COLORS.suitShadow, COLORS.player);       // far leg (shaded)
+
+    // ---------- Torso ----------
     ctx.fillStyle = COLORS.playerSuit;
-    ctx.fillRect(x, y + 8, w, h - 8);
+    roundRect(ctx, torsoX, torsoY, torsoW, torsoH, 4);
+    ctx.fill();
+    // Chest control panel.
+    ctx.fillStyle = COLORS.player;
+    ctx.fillRect(cx - 3, torsoY + 4, 6, 5);
+    ctx.fillStyle = COLORS.visor;
+    ctx.fillRect(cx - 2, torsoY + 5, 2, 3);
 
-    // Legs (animate stride when running on the ground)
-    ctx.fillStyle = "#c5cee6";
-    const stride = this.state === STATE.GROUND ? Math.sin(this.runPhase) * 5 : 0;
-    ctx.fillRect(x + 3, y + h - 8, 6, 8);
-    ctx.fillRect(x + w - 9 + stride * 0.0, y + h - 8, 6, 8);
+    // ---------- Front arm (swings opposite the near leg) ----------
+    const armSwing = running ? -Math.sin(phase) * 4 : thrusting ? -3 : 1;
+    drawLimb(ctx, cx + facing * 3, torsoY + 3, cx + facing * 4 + armSwing, torsoY + 11,
+             4, COLORS.playerSuit, COLORS.player);
 
-    // Helmet + visor
+    // ---------- Helmet + visor ----------
     ctx.fillStyle = COLORS.playerSuit;
     ctx.beginPath();
-    ctx.arc(x + w / 2, y + 8, 9, 0, Math.PI * 2);
+    ctx.arc(headCx, headCy, headR, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = COLORS.visor;
-    const vx = this.facing > 0 ? x + w / 2 - 1 : x + w / 2 - 7;
-    ctx.fillRect(vx, y + 4, 8, 6);
-
-    // Chest accent
-    ctx.fillStyle = COLORS.player;
-    ctx.fillRect(x + w / 2 - 3, y + 16, 6, 6);
+    ctx.beginPath();
+    ctx.ellipse(headCx + facing * 1.5, headCy, headR - 2.5, headR - 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.75)"; // visor glint
+    ctx.beginPath();
+    ctx.arc(headCx + facing * 2.5, headCy - 2, 1.4, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.restore();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Small drawing helpers shared by the astronaut sprite.
+// ---------------------------------------------------------------------------
+
+// A thick rounded limb segment capped with a boot/glove at the far end.
+function drawLimb(ctx, x1, y1, x2, y2, width, limbColor, capColor) {
+  ctx.strokeStyle = limbColor;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.fillStyle = capColor;
+  ctx.beginPath();
+  ctx.arc(x2, y2, width / 2 + 0.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Rounded-rect path (ctx.roundRect isn't universally available).
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }

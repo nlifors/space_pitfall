@@ -53,6 +53,11 @@ export const COLORS = {
   chasm: "#02030a",
   player: "#ffd166",
   playerSuit: "#e9efff",
+  suitShadow: "#b9c3df",  // shaded suit parts (far leg/arm) for depth
+  pack: "#46518f",        // jetpack body
+  packTrim: "#cdd6ff",    // jetpack light border/bands (high contrast on any bg)
+  flame: "#ff8a3c",       // jetpack thrust (outer)
+  flameCore: "#ffe066",   // jetpack thrust (core)
   visor: "#43e0ff",
   crystal: "#ff5fa2",
   crawler: "#7af5c0",

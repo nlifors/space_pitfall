@@ -53,6 +53,14 @@ one-directionally each frame: **input → update → collision/scoring → rende
   and answers `isSolidAt(worldX)`. `buildLevel()` generates an ordered list of
   screens using a seeded PRNG (`mulberry32`) so runs vary but the difficulty
   curve (0→1 across sectors) is deterministic per sector index.
+- `js/audio.js` — all sound, fully **synthesized at runtime** via Web Audio
+  (no asset files). One master gain feeds the speakers; muting ramps it to zero.
+  SFX are one-shot oscillator/noise voices; the background loop is a lookahead
+  scheduler that queues notes slightly ahead of the audio clock. Browsers
+  require a user gesture before audio starts, so `unlock()` is called from the
+  Launch-button click (and `Game.start`).
+- `js/particles.js` — lightweight shared particle pool (jet exhaust, pickup
+  sparkle, death burst). Pure visual; driven by the `Game`'s update/draw.
 - `js/constants.js` — **all tuning lives here** (physics, speeds, scoring,
   palette). Change game feel from this file rather than editing entity logic.
 - `js/input.js` — keyboard layer. Maps `KeyboardEvent.code` to semantic actions
@@ -74,3 +82,7 @@ one-directionally each frame: **input → update → collision/scoring → rende
   linear launch on release. Tune via `TETHER` in constants.
 - Pickups are removed by setting `collected = true` and letting `Game.step()`
   filter them out — don't splice entity arrays mid-iteration.
+- **Player → Game events use one-frame flags, not callbacks.** The Player raises
+  `fellIntoChasm` / `justJumped` / `justGrabbed` / `justReleased`; `Game.step()`
+  reads and clears them (to fire sounds/effects). Keep new player events in this
+  shape so the Player stays unaware of audio/scoring.

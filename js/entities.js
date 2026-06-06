@@ -154,11 +154,13 @@ export class Laser {
     ctx.fillRect(this.x - 3, this.y - 6, this.w + 6, 6);
     ctx.fillRect(this.x - 3, this.y + this.h, this.w + 6, 6);
     if (!this.isOn) return;
+    // Contain the glow in a save/restore so shadow state can't leak to later draws.
+    ctx.save();
     ctx.fillStyle = COLORS.laser;
     ctx.shadowColor = COLORS.laser;
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = 10;
     ctx.fillRect(this.x, this.y, this.w, this.h);
-    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 }
 

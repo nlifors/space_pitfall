@@ -14,6 +14,7 @@ const KEY_ALIASES = {
   KeyW: "jump",
   KeyZ: "grab",
   KeyP: "pause",
+  KeyM: "mute",
   Enter: "start",
 };
 
