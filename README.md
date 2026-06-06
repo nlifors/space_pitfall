@@ -12,21 +12,21 @@
 `✨ · 🌠 ⭐ · ✨ · 🌌 · ⭐ 🌠 · ✨ · ⭐ · 🌠 ✨`
 
 ```
-⬛⬛⬜⬜⬜⬜⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
-⬛⬜🟦🟦🟦⬜⬜⬛⬛⬛⬛🟥⬛⬛⬛⬛
-⬛⬜🟦🟦🟦⬜⬜⬛⬛⬛🟥🟥🟥⬛⬛⬛
-🟪⬜⬜⬜⬜⬜⬜⬛⬛⬛🟥🟥🟥⬛⬛⬛
-🟪⬜⬜🟨🟨⬜⬜⬛⬛⬛⬛🟥⬛⬛⬛⬛
-🟪⬜⬜⬜⬜⬜⬜⬛⬛⬛⬛⬛⬛⬛⬛⬛
-🟧⬜🟨⬛🟨⬜⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
-🟧⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+⬛⬛⬜⬜⬜⬜⬛⬛⬛⬛⬛⬛⬛🟫⬛⬛
+⬛⬜🟦🟦🟦⬜⬜⬛⬛⬛⬛⬛⬛🟥⬛⬛
+⬛⬜🟦🟦🟦⬜⬜⬛⬛💎⬛⬛⬛🟥⬛⬛
+🟪⬜⬜⬜⬜⬜⬜⬛⬛⬛⬛⬛⬛🟥⬛⬛
+🟪⬜⬜🟨🟨⬜⬜⬛⬛⬛⬛⬛⬛🟥⬛⬛
+🟪⬜⬜⬜⬜⬜⬜⬛⬛⬛⬛⬛⬛🟥⬛⬛
+🟧⬜🟨⬛🟨⬜⬛⬛⬛⬛⬛⬛⬛🟥⬛⬛
+🟧⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛🟥⬛⬛
 🟫🟫🟫🟫🟫⬛⬛⬛⬛🟫🟫🟫🟫🟫🟫🟫
 ⬛⬛⬛⬛⬛⬛🕳️⬛⬛⬛⬛⬛⬛⬛⬛⬛
 ```
 
-**Cross the chasms · Grab the 💎 crystals · Beware the 🕳️ void**
+**Cross the chasms · Grab the 💎 crystals · Dodge the 🟥 lasers · Beware the 🕳️ void**
 
-🧑‍🚀 jetpack spaceman&nbsp;&nbsp;·&nbsp;&nbsp;🟥 crystal&nbsp;&nbsp;·&nbsp;&nbsp;🟫 surface&nbsp;&nbsp;·&nbsp;&nbsp;🟧 jet thrust
+🧑‍🚀 jetpack spaceman&nbsp;&nbsp;·&nbsp;&nbsp;💎 crystal&nbsp;&nbsp;·&nbsp;&nbsp;🟥 laser gate&nbsp;&nbsp;·&nbsp;&nbsp;🟫 surface&nbsp;&nbsp;·&nbsp;&nbsp;🟧 jet thrust
 
 </div>
 
