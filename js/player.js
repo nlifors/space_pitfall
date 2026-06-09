@@ -6,7 +6,7 @@
 import { PLAYER, WORLD, TETHER, COLORS } from "./constants.js";
 import { input } from "./input.js";
 
-const STATE = { GROUND: "ground", AIR: "air", SWING: "swing" };
+const STATE = { GROUND: "ground", AIR: "air", SWING: "swing", CLIMB: "climb" };
 
 export class Player {
   constructor() {
@@ -24,9 +24,10 @@ export class Player {
     this.state = STATE.AIR;
     this.coyote = 0;
     this.tether = null;     // currently-held Tether, if swinging
+    this.layer = "surface"; // "surface" | "tunnel" — which band the player is in
+    this.climbTarget = null; // target layer while in the CLIMB state
     this.runPhase = 0;
     this.jumped = false;    // true while rising from a jump (for variable height)
-    this.fellIntoChasm = false;
     // One-frame event flags the Game reads to fire sound effects, then clears.
     this.justJumped = false;
     this.justGrabbed = false;
@@ -57,15 +58,17 @@ export class Player {
 
   // `onSolidGround(worldX)` returns false when the surface beneath worldX is a
   // chasm, true otherwise. Supplied by the Game from the active screen.
-  update(onSolidGround, tethers) {
+  update(onSolidGround, tethers, ladders) {
     if (this.state === STATE.SWING) {
       this.updateSwing();
+    } else if (this.state === STATE.CLIMB) {
+      this.updateClimb();
     } else {
-      this.updateRunJump(onSolidGround, tethers);
+      this.updateRunJump(onSolidGround, tethers, ladders);
     }
   }
 
-  updateRunJump(onSolidGround, tethers) {
+  updateRunJump(onSolidGround, tethers, ladders) {
     // ---- horizontal ----
     const left = input.isDown("left");
     const right = input.isDown("right");
@@ -74,6 +77,15 @@ export class Player {
     if (right) { this.vx = PLAYER.RUN_SPEED; this.facing = 1; }
     this.x += this.vx;
     if (Math.abs(this.vx) > 0) this.runPhase += 0.25;
+
+    // ---- mount a ladder (when grounded over one) ----
+    if (this.state === STATE.GROUND && ladders) {
+      const lad = ladders.find((l) => this.centerX > l.x && this.centerX < l.x + l.w);
+      if (lad) {
+        if (this.layer === "surface" && input.isDown("down")) { this.enterClimb(lad, "tunnel"); return; }
+        if (this.layer === "tunnel" && input.wasPressed("jump")) { this.enterClimb(lad, "surface"); return; }
+      }
+    }
 
     // ---- gravity ----
     this.vy = Math.min(this.vy + WORLD.GRAVITY, WORLD.TERMINAL_VY);
@@ -84,13 +96,14 @@ export class Player {
     }
     this.y += this.vy;
 
-    // ---- ground / chasm resolution ----
-    const feetX = this.centerX;
-    const groundHere = onSolidGround(feetX);
+    // ---- ground resolution (layer-aware) ----
+    const onSurface = this.layer === "surface";
+    const floorY = onSurface ? WORLD.FLOOR_Y : WORLD.TUNNEL_FLOOR_Y;
+    const groundHere = onSurface ? onSolidGround(this.centerX) : true; // tunnel floor is solid
     const feetY = this.y + this.h;
 
-    if (groundHere && feetY >= WORLD.FLOOR_Y && this.vy >= 0) {
-      this.y = WORLD.FLOOR_Y - this.h;
+    if (groundHere && feetY >= floorY && this.vy >= 0) {
+      this.y = floorY - this.h;
       this.vy = 0;
       this.state = STATE.GROUND;
       this.coyote = PLAYER.COYOTE_FRAMES;
@@ -98,10 +111,17 @@ export class Player {
     } else {
       this.state = STATE.AIR;
       if (this.coyote > 0) this.coyote--;
-      // Fell past the floor line where there is no ground -> into the void.
-      if (!groundHere && this.y > WORLD.FLOOR_Y + 30) {
-        this.fellIntoChasm = true;
+      // On the surface with no ground underfoot -> fall through the chasm into
+      // the tunnel (a soft landing below, not death).
+      if (onSurface && !groundHere && feetY > WORLD.TUNNEL_CEIL) {
+        this.layer = "tunnel";
       }
+    }
+
+    // ---- tunnel ceiling: can't rise up through the slab ----
+    if (this.layer === "tunnel" && this.y < WORLD.TUNNEL_CEIL && this.vy < 0) {
+      this.y = WORLD.TUNNEL_CEIL;
+      this.vy = 0;
     }
 
     // ---- jump (with coyote time) ----
@@ -113,8 +133,36 @@ export class Player {
       this.justJumped = true;
     }
 
-    // ---- grab a tether ----
+    // ---- grab a tether ---- (only the surface has tethers)
     if (input.wasPressed("grab")) this.tryGrab(tethers);
+  }
+
+  // Mount a ladder and traverse to the other layer. The climb auto-runs to the
+  // far end; landing puts the player back on solid ground in the new layer.
+  enterClimb(ladder, targetLayer) {
+    this.state = STATE.CLIMB;
+    this.climbTarget = targetLayer;
+    this.x = ladder.x + ladder.w / 2 - this.w / 2;
+    this.vx = 0;
+    this.vy = 0;
+    this.jumped = false;
+  }
+
+  updateClimb() {
+    const goingDown = this.climbTarget === "tunnel";
+    this.y += (goingDown ? 1 : -1) * PLAYER.CLIMB_SPEED;
+    this.runPhase += 0.18; // gentle clamber animation
+    if (goingDown && this.y >= WORLD.TUNNEL_FLOOR_Y - this.h) {
+      this.y = WORLD.TUNNEL_FLOOR_Y - this.h;
+      this.layer = "tunnel";
+      this.state = STATE.GROUND;
+      this.climbTarget = null;
+    } else if (!goingDown && this.y <= WORLD.FLOOR_Y - this.h) {
+      this.y = WORLD.FLOOR_Y - this.h;
+      this.layer = "surface";
+      this.state = STATE.GROUND;
+      this.climbTarget = null;
+    }
   }
 
   tryGrab(tethers) {
@@ -163,7 +211,7 @@ export class Player {
     const cx = x + w / 2;
     const onGround = this.state === STATE.GROUND;
     const running = onGround && Math.abs(this.vx) > 0.1;
-    const thrusting = this.state !== STATE.GROUND;
+    const thrusting = this.state === STATE.AIR || this.state === STATE.SWING;
     const phase = this.runPhase;
 
     // A little vertical bounce on each running stride.

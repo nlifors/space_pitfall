@@ -4,13 +4,15 @@
 // pickups, chasms and tethers.
 
 import { VIEW, WORLD, COLORS } from "./constants.js";
-import { Chasm, Crawler, Asteroid, Laser, Crystal, Tether } from "./entities.js";
+import { Chasm, Crawler, Asteroid, Laser, Crystal, Tether, Ladder, Spikes } from "./entities.js";
 
 export class Screen {
   constructor(def) {
+    this.name = def.name || "";
     this.chasms = def.chasms || [];
     this.entities = def.entities || [];
     this.tethers = this.entities.filter((e) => e.kind === "tether");
+    this.ladders = this.entities.filter((e) => e.kind === "ladder");
   }
 
   update() {
@@ -18,6 +20,7 @@ export class Screen {
   }
 
   // True when world-x sits over solid surface (not a chasm and within bounds).
+  // Only meaningful for the surface layer; the tunnel floor is always solid.
   isSolidAt(worldX) {
     if (worldX < 0 || worldX > VIEW.WIDTH) return false;
     for (const c of this.chasms) if (c.contains(worldX)) return false;
@@ -25,81 +28,143 @@ export class Screen {
   }
 
   draw(ctx) {
-    // Surface slab first, then carve the chasms over it.
+    const W = VIEW.WIDTH;
+    const { FLOOR_Y, SURFACE_H, TUNNEL_CEIL, TUNNEL_FLOOR_Y } = WORLD;
+
+    // Underground cavity behind the slab.
+    ctx.fillStyle = COLORS.tunnelBg;
+    ctx.fillRect(0, TUNNEL_CEIL, W, TUNNEL_FLOOR_Y - TUNNEL_CEIL);
+    // Bedrock floor of the tunnel.
+    ctx.fillStyle = COLORS.bedrock;
+    ctx.fillRect(0, TUNNEL_FLOOR_Y, W, VIEW.HEIGHT - TUNNEL_FLOOR_Y);
+    ctx.fillStyle = COLORS.bedrockTop;
+    ctx.fillRect(0, TUNNEL_FLOOR_Y, W, 3);
+
+    // Surface slab + its lit top edge + shaded underside (the tunnel ceiling).
     ctx.fillStyle = COLORS.surface;
-    ctx.fillRect(0, WORLD.FLOOR_Y, VIEW.WIDTH, WORLD.FLOOR_H);
+    ctx.fillRect(0, FLOOR_Y, W, SURFACE_H);
     ctx.fillStyle = COLORS.surfaceTop;
-    ctx.fillRect(0, WORLD.FLOOR_Y, VIEW.WIDTH, 5);
+    ctx.fillRect(0, FLOOR_Y, W, 4);
+    ctx.fillStyle = COLORS.bedrock;
+    ctx.fillRect(0, TUNNEL_CEIL - 2, W, 2);
+
+    // Carve chasms (open the slab to the tunnel), then ladders/hazards/pickups.
     for (const c of this.chasms) c.draw(ctx);
     for (const e of this.entities) e.draw(ctx);
   }
 }
 
-// --- pseudo-random generator so a run is varied but the difficulty curve is
-// controllable. Each screen is seeded by its index. ---
-function mulberry32(seed) {
-  return function () {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+// A crystal that lives in the tunnel layer (so it only counts when collected
+// from underground). Stands just above the tunnel floor.
+function tunnelCrystal(x) {
+  const c = new Crystal(x, WORLD.TUNNEL_FLOOR_Y - 30);
+  c.layer = "tunnel";
+  return c;
 }
 
-// Build one themed screen. `difficulty` (0..1) scales hazard density/speed.
-function buildScreen(index, difficulty) {
-  const rng = mulberry32(index * 1337 + 7);
-  const entities = [];
-  const chasms = [];
-  const floorTop = WORLD.FLOOR_Y - 30;
+// ---------------------------------------------------------------------------
+// Hand-authored campaign — five themed sectors of rising difficulty. Each is a
+// single 800-wide screen with a surface and an underground tunnel. Crystals are
+// the treasures (◆); some hide in the tunnel as a risk/reward for braving the
+// spikes. See the "map" in the README for an overview.
+//
+// Coordinate cheat-sheet: surface stand y≈296, on-ground crystal y≈290, a
+// jump-height crystal y≈215, tunnel crystal y≈390 (handled by tunnelCrystal).
+// ---------------------------------------------------------------------------
+const LEVELS = [
+  // 1 — LANDING ZONE: gentle intro. One slow crawler, a free tunnel crystal.
+  () => new Screen({
+    name: "LANDING ZONE",
+    chasms: [],
+    entities: [
+      new Crystal(120, 290),
+      new Crystal(450, 215),
+      new Crawler(360, 320, 520, 0.9),
+      new Ladder(660),
+      new Spikes(470, 2),
+      tunnelCrystal(240),
+    ],
+  }),
 
-  // Always sprinkle one or two crystals to reward exploration.
-  const crystalCount = 1 + (rng() > 0.5 ? 1 : 0);
-  for (let i = 0; i < crystalCount; i++) {
-    const cx = 160 + rng() * 480;
-    const cy = rng() > 0.6 ? floorTop - 90 : floorTop - 10;
-    entities.push(new Crystal(cx, cy));
-  }
+  // 2 — THE RIFT: a wide chasm. Swing the tether for the floating crystal, or
+  // fall in and pick your way past the spikes below.
+  () => new Screen({
+    name: "THE RIFT",
+    chasms: [new Chasm(320, 150)],
+    entities: [
+      new Tether(395, 60),
+      new Crystal(386, 200),   // floating over the gap
+      new Crystal(700, 290),
+      new Ladder(140),
+      new Ladder(700),
+      new Spikes(430, 2),      // under the right half of the chasm
+      tunnelCrystal(560),
+    ],
+  }),
 
-  // Pick a screen archetype.
-  const roll = rng();
-  if (roll < 0.34) {
-    // Chasm crossing — narrow enough to jump, with a tether as a safety net.
-    const gapW = 100 + difficulty * 55;
-    const gapX = VIEW.WIDTH / 2 - gapW / 2 + (rng() - 0.5) * 60;
-    chasms.push(new Chasm(gapX, gapW));
-    entities.push(new Tether(gapX + gapW / 2, 60));
-  } else if (roll < 0.6) {
-    // Crawler patrol on open surface.
-    const count = 1 + Math.round(difficulty * 1);
-    for (let i = 0; i < count; i++) {
-      const minX = 120 + i * 220;
-      entities.push(new Crawler(minX + 40, minX, minX + 150, 0.8 + difficulty * 0.9));
-    }
-  } else if (roll < 0.8) {
-    // Rolling asteroids barreling in from the right.
-    const count = 1 + Math.round(difficulty * 1);
-    for (let i = 0; i < count; i++) {
-      entities.push(new Asteroid(VIEW.WIDTH, 1.6 + difficulty * 1.3, VIEW.WIDTH + i * 320));
-    }
-  } else {
-    // Laser corridor — timed beams to dash between (longer "off" = bigger gaps).
-    const count = 1 + Math.round(difficulty * 1.5);
-    for (let i = 0; i < count; i++) {
-      entities.push(new Laser(200 + i * 170, 50, 70, i * 40));
-    }
-  }
+  // 3 — ASTEROID RUN: two rolling asteroids up top; the tunnel is a spiky but
+  // treasure-rich bypass.
+  () => new Screen({
+    name: "ASTEROID RUN",
+    chasms: [],
+    entities: [
+      new Asteroid(VIEW.WIDTH, 2.4, VIEW.WIDTH + 40),
+      new Asteroid(VIEW.WIDTH, 2.0, VIEW.WIDTH + 320),
+      new Crystal(400, 215),
+      new Ladder(120),
+      new Ladder(700),
+      new Spikes(290, 3),
+      new Spikes(540, 2),
+      tunnelCrystal(410),
+      tunnelCrystal(630),
+    ],
+  }),
 
-  return new Screen({ chasms, entities });
-}
+  // 4 — LASER GAUNTLET: three timed beams to thread, a chasm at the exit, and a
+  // tunnel detour to skip the worst of it.
+  () => new Screen({
+    name: "LASER GAUNTLET",
+    chasms: [new Chasm(690, 80)],
+    entities: [
+      new Laser(200, 50, 70, 0),
+      new Laser(360, 50, 70, 30),
+      new Laser(520, 50, 70, 60),
+      new Crystal(280, 290),
+      new Crystal(440, 290),
+      new Ladder(120),
+      new Ladder(620),
+      new Spikes(330, 2),
+      tunnelCrystal(250),
+      tunnelCrystal(480),
+    ],
+  }),
 
-// Assemble the whole run as an ordered list of screens with a rising curve.
-export function buildLevel(screenCount) {
-  const screens = [];
-  for (let i = 0; i < screenCount; i++) {
-    const difficulty = i / Math.max(1, screenCount - 1); // 0..1
-    screens.push(buildScreen(i, difficulty));
-  }
-  return screens;
+  // 5 — THE GAUNTLET: everything at once — crawler, tether chasm, laser,
+  // asteroid up top; a three-spike tunnel run below. Five treasures.
+  () => new Screen({
+    name: "THE GAUNTLET",
+    chasms: [new Chasm(360, 150)],
+    entities: [
+      new Crystal(110, 290),
+      new Crawler(140, 80, 300, 1.3),
+      new Tether(435, 60),
+      new Crystal(435, 200),   // floating over the gap
+      new Laser(610, 50, 60, 0),
+      new Asteroid(VIEW.WIDTH, 2.6, VIEW.WIDTH + 60),
+      new Crystal(730, 215),
+      new Ladder(70),
+      new Ladder(730),
+      new Spikes(210, 3),
+      new Spikes(430, 2),
+      new Spikes(580, 2),
+      tunnelCrystal(320),
+      tunnelCrystal(650),
+    ],
+  }),
+];
+
+// Build the campaign as an ordered list of fresh Screen instances (each run
+// gets new entity objects so state like asteroid positions resets cleanly).
+export function buildLevel() {
+  return LEVELS.map((make) => make());
 }

@@ -56,7 +56,7 @@ export class Game {
 
   // ---- session lifecycle ----------------------------------------------------
   start() {
-    this.screens = buildLevel(GAME.SCREEN_COUNT);
+    this.screens = buildLevel();
     this.screenIndex = 0;
     this.player = new Player();
     this.player.reset(60, WORLD.FLOOR_Y - PLAYER.H);
@@ -148,7 +148,7 @@ export class Game {
     }
 
     this.screen.update();
-    this.player.update((wx) => this.screen.isSolidAt(wx), this.screen.tethers);
+    this.player.update((wx) => this.screen.isSolidAt(wx), this.screen.tethers, this.screen.ladders);
 
     // Translate the player's one-frame event flags into sound effects.
     if (this.player.justJumped) { this.audio.jump(); this.player.justJumped = false; }
@@ -156,7 +156,7 @@ export class Game {
     if (this.player.justReleased) { this.audio.release(); this.player.justReleased = false; }
 
     // Jet exhaust: a warm downward plume from the jetpack nozzle while flying.
-    if (this.player.state !== "ground") {
+    if (this.player.state === "air" || this.player.state === "swing") {
       const noz = this.player.jetNozzle;
       this.fx.emit(noz.x, noz.y, {
         count: 2, color: COLORS.flameCore, dir: Math.PI / 2, spread: 0.5,
@@ -171,12 +171,12 @@ export class Game {
 
     if (this.invuln > 0) this.invuln--;
 
-    // Fell into a chasm? (the void is fatal even during invulnerability)
-    if (this.player.fellIntoChasm) { this.loseLife(); return; }
-
-    // Hazard + pickup collisions.
+    // Hazard + pickup collisions — only entities on the player's current layer
+    // (surface hazards can't hurt you underground, and vice versa).
     const box = this.player.box;
+    const layer = this.player.layer;
     for (const e of this.screen.entities) {
+      if ((e.layer || "surface") !== layer) continue;
       if (this.invuln <= 0 && e.kind === "hazard" && e.hits && e.hits(box)) { this.loseLife(); return; }
       if (e.kind === "pickup" && e.hits && e.hits(box)) {
         e.collected = true;
@@ -308,7 +308,9 @@ export class Game {
 
     ctx.fillStyle = COLORS.hud;
     ctx.textAlign = "center";
-    ctx.fillText(`SECTOR ${this.screenIndex + 1}/${this.screens.length}`, VIEW.WIDTH / 2, 15);
+    const label = `SECTOR ${this.screenIndex + 1}/${this.screens.length}`;
+    const name = this.screen.name ? ` · ${this.screen.name}` : "";
+    ctx.fillText(label + name, VIEW.WIDTH / 2, 15);
 
     ctx.textAlign = "right";
     const t = String(this.timeLeft).padStart(3, "0");

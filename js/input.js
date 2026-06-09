@@ -12,6 +12,8 @@ const KEY_ALIASES = {
   ArrowUp: "jump",
   Space: "jump",
   KeyW: "jump",
+  ArrowDown: "down",
+  KeyS: "down",
   KeyZ: "grab",
   KeyP: "pause",
   KeyM: "mute",
@@ -25,7 +27,7 @@ function resolve(code) {
 window.addEventListener("keydown", (e) => {
   const action = resolve(e.code);
   if (!action) return;
-  if (action === "jump" || action === "pause") e.preventDefault();
+  if (action === "jump" || action === "pause" || action === "down") e.preventDefault();
   if (!held.has(action)) pressedThisFrame.add(action);
   held.add(action);
 });

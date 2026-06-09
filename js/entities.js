@@ -30,11 +30,74 @@ export class Chasm {
     return worldX > this.x && worldX < this.x + this.w;
   }
   draw(ctx) {
-    ctx.fillStyle = COLORS.chasm;
-    ctx.fillRect(this.x, WORLD.FLOOR_Y, this.w, WORLD.FLOOR_H);
-    // faint plasma glow at the lip of the void
-    ctx.fillStyle = "rgba(255, 95, 162, 0.18)";
-    ctx.fillRect(this.x, WORLD.FLOOR_Y, this.w, 4);
+    // Open the surface slab so the tunnel cavity (drawn behind) shows through —
+    // falling in drops the player into the underground rather than killing them.
+    ctx.fillStyle = COLORS.tunnelBg;
+    ctx.fillRect(this.x, WORLD.FLOOR_Y, this.w, WORLD.SURFACE_H);
+    // faint plasma glow at the lip of the gap
+    ctx.fillStyle = "rgba(255, 95, 162, 0.20)";
+    ctx.fillRect(this.x, WORLD.FLOOR_Y, this.w, 3);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ladder: connects the surface to the tunnel. The Player grabs it (down to
+// descend, jump to ascend) — see Player.enterClimb.
+// ---------------------------------------------------------------------------
+export class Ladder {
+  constructor(x) {
+    this.kind = "ladder";
+    this.w = 16;
+    this.x = x;
+    this.top = WORLD.FLOOR_Y;
+    this.bottom = WORLD.TUNNEL_FLOOR_Y;
+  }
+  update() {}
+  contains(cx) { return cx > this.x && cx < this.x + this.w; }
+  draw(ctx) {
+    const railL = this.x + 3;
+    const railR = this.x + this.w - 3;
+    ctx.strokeStyle = COLORS.ladder;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(railL, this.top); ctx.lineTo(railL, this.bottom);
+    ctx.moveTo(railR, this.top); ctx.lineTo(railR, this.bottom);
+    ctx.stroke();
+    for (let y = this.top + 6; y < this.bottom; y += 9) {
+      ctx.beginPath();
+      ctx.moveTo(railL, y); ctx.lineTo(railR, y);
+      ctx.stroke();
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Spikes: a static tunnel-floor hazard. Only dangerous to a player in the
+// tunnel layer (kind "hazard", layer "tunnel").
+// ---------------------------------------------------------------------------
+export class Spikes {
+  constructor(x, count = 3) {
+    this.kind = "hazard";
+    this.layer = "tunnel";
+    this.count = count;
+    this.w = count * 10;
+    this.h = 12;
+    this.x = x;
+    this.y = WORLD.TUNNEL_FLOOR_Y - this.h;
+  }
+  update() {}
+  hits(box) { return rectsOverlap(this, box); }
+  draw(ctx) {
+    ctx.fillStyle = COLORS.spike;
+    for (let i = 0; i < this.count; i++) {
+      const bx = this.x + i * 10;
+      ctx.beginPath();
+      ctx.moveTo(bx, this.y + this.h);
+      ctx.lineTo(bx + 5, this.y);
+      ctx.lineTo(bx + 10, this.y + this.h);
+      ctx.closePath();
+      ctx.fill();
+    }
   }
 }
 

@@ -39,20 +39,24 @@ one-directionally each frame: **input → update → collision/scoring → rende
   the starfield, and HUD/overlay chrome. **All game-level decisions live here**
   — entities never decide that a life is lost or score is awarded.
 - `js/player.js` — the astronaut entity. Owns movement, gravity, jumping (with
-  coyote-time), and the tether-swing sub-state machine
-  (`ground / air / swing`). It reports falling into a chasm via the
-  `fellIntoChasm` flag but does **not** mutate game state; the `Game` reads that
-  flag and calls `loseLife()`.
-- `js/entities.js` — every hazard/pickup/swing object: `Chasm`, `Crawler`,
-  `Asteroid`, `Laser`, `Crystal`, `Tether`. Each exposes a uniform
-  `update()` / `draw(ctx)` interface and a `kind` string
-  (`"hazard"` | `"pickup"` | `"tether"`) that the collision pass dispatches on.
-  `Chasm` is special: it's not a touch-hazard — it represents *absence* of floor
-  and is consulted by `Screen.isSolidAt()`.
-- `js/level.js` — the world model. `Screen` holds one screen's chasms/entities
-  and answers `isSolidAt(worldX)`. `buildLevel()` generates an ordered list of
-  screens using a seeded PRNG (`mulberry32`) so runs vary but the difficulty
-  curve (0→1 across sectors) is deterministic per sector index.
+  coyote-time), the tether-swing and ladder-climb sub-state machines
+  (`ground / air / swing / climb`), and which **layer** it's in
+  (`surface` / `tunnel`). Falling off the surface into a chasm switches the
+  layer to `tunnel` (a soft drop, not death); ladders move between layers via
+  `enterClimb()`. The player flags events but does **not** mutate game state.
+- `js/entities.js` — every hazard/pickup/swing/ladder object: `Chasm`,
+  `Crawler`, `Asteroid`, `Laser`, `Crystal`, `Tether`, `Ladder`, `Spikes`. Each
+  exposes a uniform `update()` / `draw(ctx)` interface and a `kind` string
+  (`"hazard"` | `"pickup"` | `"tether"` | `"ladder"`) that the collision pass
+  dispatches on, plus an optional `layer` (default `"surface"`; `"tunnel"` for
+  underground things like `Spikes`). `Chasm` is special: not a touch-hazard, it
+  represents *absence* of slab and is consulted by `Screen.isSolidAt()`.
+- `js/level.js` — the world model. `Screen` holds one screen's chasms/entities/
+  ladders and answers `isSolidAt(worldX)` (surface only; the tunnel floor is
+  always solid). `Screen.draw()` renders the vertical cross-section: sky,
+  surface slab (with chasms carved open to the tunnel), tunnel cavity, bedrock.
+  `buildLevel()` generates screens with a seeded PRNG (`mulberry32`) so runs
+  vary but the difficulty curve (0→1 across sectors) is deterministic.
 - `js/audio.js` — all sound, fully **synthesized at runtime** via Web Audio
   (no asset files). One master gain feeds the speakers; muting ramps it to zero.
   SFX are one-shot oscillator/noise voices; the background loop is a lookahead
@@ -74,6 +78,12 @@ one-directionally each frame: **input → update → collision/scoring → rende
   one screen wide; advancing right past `VIEW.WIDTH` swaps in the next `Screen`
   and re-places the player at the opposite edge (see `Game.advanceScreen`).
   Coordinates are screen-local, not world-global.
+- **Two stacked layers, one screen.** Every screen shows a surface (top) and an
+  underground tunnel (bottom) at once — no camera move. The player carries a
+  `layer` (`surface` / `tunnel`); the vertical bands are defined in `WORLD`
+  (`FLOOR_Y`, `TUNNEL_CEIL`, `TUNNEL_FLOOR_Y`). Collisions are **layer-filtered**
+  in `Game.step()` (`(e.layer || "surface") === player.layer`), so surface
+  hazards can't hurt an underground player and vice versa.
 - **Entities are dumb; the Game is smart.** Keep collision *intent* on entities
   (the `kind` field + a `hits(box)` test) but keep collision *consequences*
   (life loss, scoring, removal) in `Game.step()`.
@@ -83,6 +93,6 @@ one-directionally each frame: **input → update → collision/scoring → rende
 - Pickups are removed by setting `collected = true` and letting `Game.step()`
   filter them out — don't splice entity arrays mid-iteration.
 - **Player → Game events use one-frame flags, not callbacks.** The Player raises
-  `fellIntoChasm` / `justJumped` / `justGrabbed` / `justReleased`; `Game.step()`
-  reads and clears them (to fire sounds/effects). Keep new player events in this
-  shape so the Player stays unaware of audio/scoring.
+  `justJumped` / `justGrabbed` / `justReleased`; `Game.step()` reads and clears
+  them (to fire sounds/effects). Keep new player events in this shape so the
+  Player stays unaware of audio/scoring.
