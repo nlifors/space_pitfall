@@ -41,6 +41,8 @@
 
 **Cross the chasms · Grab the 💎 crystals · Dodge the 🟥 lasers · Beware the 🕳️ void**
 
+### ▶ [**Play in your browser**](https://nlifors.github.io/space_pitfall/)
+
 </div>
 
 # Space Pitfall
@@ -54,8 +56,11 @@ and grab every crystal before the clock runs out. Climb down a ladder into the
 
 ## Play
 
-ES modules must be served over HTTP (opening `index.html` via `file://` is
-blocked by browser CORS rules). From the project root:
+Play the live build at **<https://nlifors.github.io/space_pitfall/>**.
+
+To run it locally, note that ES modules must be served over HTTP (opening
+`index.html` via `file://` is blocked by browser CORS rules). From the project
+root:
 
 ```bash
 python3 serve.py            # no-cache dev server -> http://localhost:8000
